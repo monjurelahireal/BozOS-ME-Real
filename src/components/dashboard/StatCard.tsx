@@ -18,12 +18,12 @@ export default function StatCard({
           {label}
         </p>
 
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-slate-300">
           •••
         </span>
       </div>
 
-      <p className="mt-4 text-2xl font-bold tracking-tight">
+      <p className="mt-4 text-2xl font-bold tracking-tight text-slate-950">
         {value}
       </p>
 

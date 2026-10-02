@@ -1,180 +1,161 @@
-import Sidebar from "@/components/layout/Sidebar";
-import Topbar from "@/components/layout/Topbar";
+"use client";
+
+import { useState } from "react";
+
+type Invoice = {
+  id: number;
+  customer: string;
+  amount: number;
+  status: "Paid" | "Pending";
+};
 
 export default function InvoicesPage() {
-  const invoices = [
+  const [invoices, setInvoices] = useState<Invoice[]>([
     {
-      id: "#INV-1048",
+      id: 1048,
       customer: "Acme Studio",
-      amount: "$2,450",
+      amount: 2450,
       status: "Paid",
-      date: "Sep 28, 2026",
     },
     {
-      id: "#INV-1047",
+      id: 1047,
       customer: "Nova Digital",
-      amount: "$1,820",
+      amount: 1820,
       status: "Pending",
-      date: "Sep 26, 2026",
     },
-    {
-      id: "#INV-1046",
-      customer: "Vertex Labs",
-      amount: "$3,200",
-      status: "Overdue",
-      date: "Sep 22, 2026",
-    },
-    {
-      id: "#INV-1045",
-      customer: "Pixel House",
-      amount: "$980",
-      status: "Paid",
-      date: "Sep 18, 2026",
-    },
-  ];
+  ]);
+
+  const [customer, setCustomer] = useState("");
+  const [amount, setAmount] = useState("");
+  const [showForm, setShowForm] = useState(false);
+
+  function createInvoice() {
+    if (!customer.trim() || !amount.trim()) {
+      return;
+    }
+
+    const newInvoice: Invoice = {
+      id: 1049 + invoices.length,
+      customer: customer.trim(),
+      amount: Number(amount),
+      status: "Pending",
+    };
+
+    setInvoices([newInvoice, ...invoices]);
+    setCustomer("");
+    setAmount("");
+    setShowForm(false);
+  }
 
   return (
-    <main className="flex min-h-screen bg-slate-50 text-slate-900">
-      <Sidebar />
+    <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Invoices</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Create and manage your business invoices.
+            </p>
+          </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            {showForm ? "Close" : "Create Invoice"}
+          </button>
+        </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1600px] px-5 py-6 sm:px-6 lg:px-8">
-            <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        {showForm && (
+          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold">New Invoice</h2>
+
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-1 text-sm text-slate-400">
-                  Workspace
-                </p>
+                <label className="mb-1 block text-sm font-medium">
+                  Customer
+                </label>
 
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                  Invoices
-                </h1>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Manage and track your business invoices.
-                </p>
+                <input
+                  type="text"
+                  value={customer}
+                  onChange={(e) => setCustomer(e.target.value)}
+                  placeholder="Customer name"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
+                />
               </div>
 
-              <button
-                type="button"
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition hover:bg-slate-800"
-              >
-                + Create invoice
-              </button>
-            </section>
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Amount
+                </label>
 
-            <section className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm text-slate-500">
-                  Total invoices
-                </p>
-
-                <p className="mt-2 text-2xl font-bold text-slate-950">
-                  24
-                </p>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
+                />
               </div>
+            </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm text-slate-500">
-                  Paid
-                </p>
+            <button
+              onClick={createInvoice}
+              className="mt-4 rounded-lg bg-slate-900 px-5 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              Save Invoice
+            </button>
+          </div>
+        )}
 
-                <p className="mt-2 text-2xl font-bold text-emerald-600">
-                  16
-                </p>
-              </div>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <h2 className="font-semibold">Invoice List</h2>
+          </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm text-slate-500">
-                  Outstanding
-                </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Invoice</th>
+                  <th className="px-5 py-3 font-medium">Customer</th>
+                  <th className="px-5 py-3 font-medium">Amount</th>
+                  <th className="px-5 py-3 font-medium">Status</th>
+                </tr>
+              </thead>
 
-                <p className="mt-2 text-2xl font-bold text-slate-950">
-                  $4,280
-                </p>
-              </div>
-            </section>
+              <tbody>
+                {invoices.map((invoice) => (
+                  <tr
+                    key={invoice.id}
+                    className="border-t border-slate-100"
+                  >
+                    <td className="px-5 py-4 font-medium">
+                      #INV-{invoice.id}
+                    </td>
 
-            <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-200 px-5 py-4">
-                <h2 className="font-semibold text-slate-900">
-                  Recent invoices
-                </h2>
+                    <td className="px-5 py-4">{invoice.customer}</td>
 
-                <p className="mt-1 text-sm text-slate-400">
-                  Latest invoice activity
-                </p>
-              </div>
+                    <td className="px-5 py-4">
+                      ${invoice.amount.toLocaleString()}
+                    </td>
 
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[700px] text-left text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
-                    <tr>
-                      <th className="px-5 py-3 font-medium">
-                        Invoice
-                      </th>
-
-                      <th className="px-5 py-3 font-medium">
-                        Customer
-                      </th>
-
-                      <th className="px-5 py-3 font-medium">
-                        Date
-                      </th>
-
-                      <th className="px-5 py-3 font-medium">
-                        Amount
-                      </th>
-
-                      <th className="px-5 py-3 font-medium">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-100">
-                    {invoices.map((invoice) => (
-                      <tr
-                        key={invoice.id}
-                        className="transition hover:bg-slate-50"
+                    <td className="px-5 py-4">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                          invoice.status === "Paid"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-yellow-100 text-yellow-700"
+                        }`}
                       >
-                        <td className="px-5 py-4 font-medium text-slate-900">
-                          {invoice.id}
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-600">
-                          {invoice.customer}
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-500">
-                          {invoice.date}
-                        </td>
-
-                        <td className="px-5 py-4 font-medium text-slate-900">
-                          {invoice.amount}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                              invoice.status === "Paid"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : invoice.status === "Pending"
-                                  ? "bg-amber-50 text-amber-700"
-                                  : "bg-red-50 text-red-700"
-                            }`}
-                          >
-                            {invoice.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+                        {invoice.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

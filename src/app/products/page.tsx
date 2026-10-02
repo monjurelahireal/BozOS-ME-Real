@@ -1,480 +1,377 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Sidebar from "@/components/layout/Sidebar";
-import Topbar from "@/components/layout/Topbar";
-import ProductsTable, {
-  type Product,
-} from "@/components/products/ProductsTable";
+import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import ProductsTable, {
+  Product,
+} from "@/components/products/ProductsTable";
 
-type DatabaseProduct = {
+type ProductRow = {
   id: string;
   name: string;
   category: string;
   price: number;
   sales: number;
-  status: string;
+  status: "Active" | "Inactive";
   created_at: string;
 };
 
 const initialProducts: Product[] = [
   {
-    name: "Website Development",
-    category: "Development",
-    price: "$2,500",
-    sales: 12,
-    status: "Active",
-  },
-  {
-    name: "UI/UX Design",
-    category: "Design",
-    price: "$1,200",
-    sales: 18,
-    status: "Active",
-  },
-  {
-    name: "Business Dashboard",
+    name: "Analytics Pro",
     category: "Software",
-    price: "$3,800",
-    sales: 7,
+    price: "$149",
+    sales: 124,
     status: "Active",
   },
   {
-    name: "Maintenance Plan",
-    category: "Support",
-    price: "$450",
-    sales: 24,
+    name: "Starter Plan",
+    category: "Subscription",
+    price: "$49",
+    sales: 86,
     status: "Active",
+  },
+  {
+    name: "Business Suite",
+    category: "Software",
+    price: "$299",
+    sales: 64,
+    status: "Active",
+  },
+  {
+    name: "Consulting Pack",
+    category: "Service",
+    price: "$499",
+    sales: 32,
+    status: "Inactive",
   },
 ];
 
-function formatPrice(price: number) {
-  return `$${price.toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-  })}`;
-}
-
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] =
-    useState<Product | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [showModal, setShowModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
-  const [sales, setSales] = useState("");
-  const [status, setStatus] = useState("Active");
+  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
-  useEffect(() => {
-    async function loadProducts() {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
+  async function loadProducts() {
+    setLoading(true);
+    setError("");
 
-      if (error) {
-        console.error("Could not load products:", error);
-        setIsLoaded(true);
-        return;
-      }
+    const { data, error: fetchError } = await supabase
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-      if (data && data.length > 0) {
-        const databaseProducts = data as DatabaseProduct[];
-
-        setProducts(
-          databaseProducts.map((product) => ({
-            name: product.name,
-            category: product.category,
-            price: formatPrice(product.price),
-            sales: product.sales,
-            status: product.status,
-          })),
-        );
-      }
-
-      setIsLoaded(true);
+    if (fetchError) {
+      console.error(fetchError);
+      setError(fetchError.message);
+      setLoading(false);
+      return;
     }
 
+    const rows = (data ?? []) as ProductRow[];
+
+    setProducts(
+      rows.map((product) => ({
+        id: product.id,
+        name: product.name,
+        category: product.category,
+        price: `$${Number(product.price).toFixed(2)}`,
+        sales: product.sales,
+        status: product.status,
+      })),
+    );
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
     loadProducts();
   }, []);
 
-  const activeProducts = products.filter(
-    (product) => product.status === "Active",
-  ).length;
-
-  function resetForm() {
+  function openAddModal() {
+    setEditingProduct(null);
     setName("");
     setCategory("");
     setPrice("");
-    setSales("");
     setStatus("Active");
-    setEditingProduct(null);
-    setIsModalOpen(false);
+    setError("");
+    setShowModal(true);
   }
 
-  function openAddModal() {
-    resetForm();
-    setIsModalOpen(true);
-  }
-
-  function handleEdit(product: Product) {
+  function openEditModal(product: Product) {
     setEditingProduct(product);
     setName(product.name);
     setCategory(product.category);
-    setPrice(product.price.replace(/^\$/, "").replace(/,/g, ""));
-    setSales(String(product.sales));
-    setStatus(product.status);
-    setIsModalOpen(true);
+    setPrice(product.price.replace("$", ""));
+    setStatus(product.status === "Inactive" ? "Inactive" : "Active");
+    setError("");
+    setShowModal(true);
   }
 
-  async function handleDelete(product: Product) {
-    const confirmed = window.confirm(
-      `Delete "${product.name}"? This action cannot be undone.`,
-    );
-
-    if (!confirmed) return;
-
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("name", product.name)
-      .eq("category", product.category);
-
-    if (error) {
-      console.error("Could not delete product:", error);
-      return;
-    }
-
-    setProducts((currentProducts) =>
-      currentProducts.filter((item) => item !== product),
-    );
+  function closeModal() {
+    setShowModal(false);
+    setEditingProduct(null);
+    setName("");
+    setCategory("");
+    setPrice("");
+    setStatus("Active");
+    setError("");
   }
 
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!name.trim() || !category.trim() || !price.trim()) {
-      return;
-    }
+    setError("");
 
     const numericPrice = Number(price);
 
-    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+    if (
+      !name.trim() ||
+      !category.trim() ||
+      price.trim() === "" ||
+      Number.isNaN(numericPrice)
+    ) {
+      setError("Please enter a valid product name, category, and price.");
       return;
     }
 
-    const numericSales = Math.max(
-      0,
-      Math.floor(Number(sales) || 0),
-    );
-
-    if (editingProduct) {
-      const { error } = await supabase
+    if (editingProduct?.id) {
+      const { error: updateError } = await supabase
         .from("products")
         .update({
           name: name.trim(),
           category: category.trim(),
           price: numericPrice,
-          sales: numericSales,
           status,
         })
-        .eq("name", editingProduct.name)
-        .eq("category", editingProduct.category);
+        .eq("id", editingProduct.id);
 
-      if (error) {
-        console.error("Could not update product:", error);
+      if (updateError) {
+        console.error(updateError);
+        setError(updateError.message);
         return;
       }
-
-      const updatedProduct: Product = {
+    } else {
+      const { error: insertError } = await supabase.from("products").insert({
         name: name.trim(),
         category: category.trim(),
-        price: formatPrice(numericPrice),
-        sales: numericSales,
+        price: numericPrice,
+        sales: 0,
         status,
-      };
+      });
 
-      setProducts((currentProducts) =>
-        currentProducts.map((product) =>
-          product === editingProduct
-            ? updatedProduct
-            : product,
-        ),
-      );
-    } else {
-      const { data, error } = await supabase
-        .from("products")
-        .insert({
-          name: name.trim(),
-          category: category.trim(),
-          price: numericPrice,
-          sales: numericSales,
-          status,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Could not create product:", error);
+      if (insertError) {
+        console.error(insertError);
+        setError(insertError.message);
         return;
       }
-
-      const createdProduct = data as DatabaseProduct;
-
-      setProducts((currentProducts) => [
-        {
-          name: createdProduct.name,
-          category: createdProduct.category,
-          price: formatPrice(createdProduct.price),
-          sales: createdProduct.sales,
-          status: createdProduct.status,
-        },
-        ...currentProducts,
-      ]);
     }
 
-    resetForm();
+    closeModal();
+    await loadProducts();
+  }
+
+  async function handleDelete(product: Product) {
+    if (!product.id) {
+      setError("This product does not have a database ID.");
+      return;
+    }
+
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", product.id);
+
+    if (deleteError) {
+      console.error(deleteError);
+      setError(deleteError.message);
+      return;
+    }
+
+    await loadProducts();
   }
 
   return (
-    <main className="flex min-h-screen bg-slate-50 text-slate-900">
-      <Sidebar />
+    <main className="flex-1 overflow-y-auto bg-slate-50">
+      <div className="mx-auto max-w-7xl px-8 py-8">
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
+              Catalog
+            </p>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+              Products
+            </h1>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1600px] px-5 py-6 sm:px-6 lg:px-8">
-            <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-              <div>
-                <p className="mb-1 text-sm text-slate-400">
-                  Workspace
-                </p>
-
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                  Products
-                </h1>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Manage your products and services.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition hover:bg-slate-800"
-              >
-                + Add product
-              </button>
-            </section>
-
-            <section className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm text-slate-500">
-                  Total products
-                </p>
-                <p className="mt-2 text-2xl font-bold text-slate-950">
-                  {products.length}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm text-slate-500">
-                  Active products
-                </p>
-                <p className="mt-2 text-2xl font-bold text-emerald-600">
-                  {activeProducts}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm text-slate-500">
-                  Product revenue
-                </p>
-                <p className="mt-2 text-2xl font-bold text-slate-950">
-                  $30,450
-                </p>
-              </div>
-            </section>
-
-            {!isLoaded ? (
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-                Loading products...
-              </div>
-            ) : (
-              <ProductsTable
-                products={products}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            )}
+            <p className="mt-1 text-sm text-slate-500">
+              Manage products, pricing, sales, and availability.
+            </p>
           </div>
+
+          <button
+            type="button"
+            onClick={openAddModal}
+            className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+          >
+            Add Product
+          </button>
+        </div>
+
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Total Products
+            </p>
+
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {products.length}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Active Products
+            </p>
+
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {products.filter((product) => product.status === "Active").length}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Product Revenue
+            </p>
+
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              $30,450
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
+        <div className="rounded-xl border border-slate-200 bg-white">
+          {loading ? (
+            <div className="px-6 py-12 text-center text-sm text-slate-400">
+              Loading products...
+            </div>
+          ) : (
+            <ProductsTable
+              products={products}
+              onEdit={openEditModal}
+              onDelete={handleDelete}
+            />
+          )}
         </div>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/40 px-4 py-6">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="product-modal-title"
-            className="my-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
-          >
-            <div className="mb-5 flex items-start justify-between">
-              <div>
-                <h2
-                  id="product-modal-title"
-                  className="text-lg font-semibold text-slate-950"
-                >
-                  {editingProduct ? "Edit product" : "Add product"}
-                </h2>
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-slate-900">
+                {editingProduct ? "Edit Product" : "Add Product"}
+              </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  {editingProduct
-                    ? "Update the product information."
-                    : "Add a new product or service."}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={resetForm}
-                aria-label="Close modal"
-                className="rounded-lg px-2 py-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-              >
-                ✕
-              </button>
+              <p className="mt-1 text-sm text-slate-500">
+                {editingProduct
+                  ? "Update the product information."
+                  : "Add a new product to your catalog."}
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label
-                  htmlFor="product-name"
-                  className="mb-1.5 block text-sm font-medium text-slate-700"
-                >
-                  Product name
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Product Name
                 </label>
 
                 <input
-                  id="product-name"
-                  type="text"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Website Development"
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
+                  placeholder="e.g. Analytics Pro"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                   required
                 />
               </div>
 
               <div>
-                <label
-                  htmlFor="product-category"
-                  className="mb-1.5 block text-sm font-medium text-slate-700"
-                >
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   Category
                 </label>
 
                 <input
-                  id="product-category"
-                  type="text"
                   value={category}
-                  onChange={(event) =>
-                    setCategory(event.target.value)
-                  }
-                  placeholder="Development"
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
+                  onChange={(event) => setCategory(event.target.value)}
+                  placeholder="e.g. Software"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                   required
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor="product-price"
-                    className="mb-1.5 block text-sm font-medium text-slate-700"
-                  >
-                    Price ($)
-                  </label>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Price
+                </label>
 
-                  <input
-                    id="product-price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={price}
-                    onChange={(event) =>
-                      setPrice(event.target.value)
-                    }
-                    placeholder="2500"
-                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="product-sales"
-                    className="mb-1.5 block text-sm font-medium text-slate-700"
-                  >
-                    Sales
-                  </label>
-
-                  <input
-                    id="product-sales"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={sales}
-                    onChange={(event) =>
-                      setSales(event.target.value)
-                    }
-                    placeholder="0"
-                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
-                  />
-                </div>
+                <input
+                  value={price}
+                  onChange={(event) => setPrice(event.target.value)}
+                  placeholder="149"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                  required
+                />
               </div>
 
               <div>
-                <label
-                  htmlFor="product-status"
-                  className="mb-1.5 block text-sm font-medium text-slate-700"
-                >
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   Status
                 </label>
 
                 <select
-                  id="product-status"
                   value={status}
                   onChange={(event) =>
-                    setStatus(event.target.value)
+                    setStatus(event.target.value as "Active" | "Inactive")
                   }
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                 </select>
               </div>
 
-              <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+              <div className="flex justify-end gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={resetForm}
-                  className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  onClick={closeModal}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="h-10 rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition hover:bg-slate-800"
+                  className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
                 >
-                  {editingProduct ? "Save changes" : "Add product"}
+                  {editingProduct ? "Save Changes" : "Add Product"}
                 </button>
               </div>
             </form>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-type Product = {
+export type Product = {
   name: string;
   category: string;
   price: string;
@@ -12,27 +12,33 @@ type Product = {
 
 type ProductsTableProps = {
   products: Product[];
+  onEdit: (product: Product) => void;
+  onDelete: (product: Product) => void;
 };
 
 export default function ProductsTable({
   products,
+  onEdit,
+  onDelete,
 }: ProductsTableProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
 
-  const categories = useMemo(() => {
-    return ["All", ...new Set(products.map((product) => product.category))];
-  }, [products]);
+  const categories = useMemo(
+    () => [
+      "All",
+      ...new Set(products.map((product) => product.category)),
+    ],
+    [products],
+  );
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
+      const searchText = search.toLowerCase().trim();
+
       const matchesSearch =
-        product.name
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        product.category
-          .toLowerCase()
-          .includes(search.toLowerCase());
+        product.name.toLowerCase().includes(searchText) ||
+        product.category.toLowerCase().includes(searchText);
 
       const matchesCategory =
         category === "All" || product.category === category;
@@ -42,36 +48,37 @@ export default function ProductsTable({
   }, [products, search, category]);
 
   return (
-    <section className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">
               Product list
             </h2>
-
             <p className="mt-1 text-sm text-slate-500">
-              Search and filter your products.
+              Search, filter, edit, and manage products.
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
-              type="text"
+              type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search products..."
-              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-slate-400 sm:w-64"
+              aria-label="Search products"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400 sm:w-64"
             />
 
             <select
               value={category}
               onChange={(event) => setCategory(event.target.value)}
-              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+              aria-label="Filter by category"
+              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
             >
               {categories.map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {item === "All" ? "All categories" : item}
                 </option>
               ))}
             </select>
@@ -80,28 +87,19 @@ export default function ProductsTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px] text-left">
+        <table className="w-full min-w-[850px] text-left">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Product
-              </th>
-
-              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Category
-              </th>
-
-              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Price
-              </th>
-
-              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Sales
-              </th>
-
-              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Status
-              </th>
+              {["Product", "Category", "Price", "Sales", "Status", "Actions"].map(
+                (heading) => (
+                  <th
+                    key={heading}
+                    className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                  >
+                    {heading}
+                  </th>
+                ),
+              )}
             </tr>
           </thead>
 
@@ -109,7 +107,7 @@ export default function ProductsTable({
             {filteredProducts.map((product) => (
               <tr
                 key={`${product.name}-${product.category}`}
-                className="border-b border-slate-100 last:border-0"
+                className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"
               >
                 <td className="px-5 py-4 text-sm font-medium text-slate-900">
                   {product.name}
@@ -128,9 +126,35 @@ export default function ProductsTable({
                 </td>
 
                 <td className="px-5 py-4">
-                  <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                      product.status === "Active"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
                     {product.status}
                   </span>
+                </td>
+
+                <td className="px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(product)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onDelete(product)}
+                      className="text-sm font-medium text-red-600 hover:text-red-800"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -138,7 +162,7 @@ export default function ProductsTable({
             {filteredProducts.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-5 py-10 text-center text-sm text-slate-500"
                 >
                   No products found.
@@ -147,6 +171,10 @@ export default function ProductsTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+        Showing {filteredProducts.length} of {products.length} products
       </div>
     </section>
   );

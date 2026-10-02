@@ -6,8 +6,17 @@ import Topbar from "@/components/layout/Topbar";
 import ProductsTable, {
   type Product,
 } from "@/components/products/ProductsTable";
+import { supabase } from "@/lib/supabase";
 
-const STORAGE_KEY = "biz-os-products";
+type DatabaseProduct = {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  sales: number;
+  status: string;
+  created_at: string;
+};
 
 const initialProducts: Product[] = [
   {
@@ -40,14 +49,17 @@ const initialProducts: Product[] = [
   },
 ];
 
-export default function ProductsPage() {
-  const [products, setProducts] =
-    useState<Product[]>(initialProducts);
+function formatPrice(price: number) {
+  return `$${price.toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  })}`;
+}
 
+export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>(initialProducts);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] =
     useState<Product | null>(null);
-
   const [isLoaded, setIsLoaded] = useState(false);
 
   const [name, setName] = useState("");
@@ -56,50 +68,38 @@ export default function ProductsPage() {
   const [sales, setSales] = useState("");
   const [status, setStatus] = useState("Active");
 
-  // Load saved products from this browser.
   useEffect(() => {
-    try {
-      const savedProducts = localStorage.getItem(STORAGE_KEY);
+    async function loadProducts() {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (savedProducts !== null) {
-        const parsedProducts: unknown = JSON.parse(savedProducts);
-
-        if (
-          Array.isArray(parsedProducts) &&
-          parsedProducts.every(
-            (product) =>
-              product !== null &&
-              typeof product === "object" &&
-              typeof product.name === "string" &&
-              typeof product.category === "string" &&
-              typeof product.price === "string" &&
-              typeof product.sales === "number" &&
-              typeof product.status === "string",
-          )
-        ) {
-          setProducts(parsedProducts as Product[]);
-        }
+      if (error) {
+        console.error("Could not load products:", error);
+        setIsLoaded(true);
+        return;
       }
-    } catch {
-      console.error("Could not load saved products.");
-    } finally {
+
+      if (data && data.length > 0) {
+        const databaseProducts = data as DatabaseProduct[];
+
+        setProducts(
+          databaseProducts.map((product) => ({
+            name: product.name,
+            category: product.category,
+            price: formatPrice(product.price),
+            sales: product.sales,
+            status: product.status,
+          })),
+        );
+      }
+
       setIsLoaded(true);
     }
+
+    loadProducts();
   }, []);
-
-  // Save products whenever the list changes.
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(products),
-      );
-    } catch {
-      console.error("Could not save products in this browser.");
-    }
-  }, [products, isLoaded]);
 
   const activeProducts = products.filter(
     (product) => product.status === "Active",
@@ -130,19 +130,32 @@ export default function ProductsPage() {
     setIsModalOpen(true);
   }
 
-  function handleDelete(product: Product) {
+  async function handleDelete(product: Product) {
     const confirmed = window.confirm(
       `Delete "${product.name}"? This action cannot be undone.`,
     );
 
     if (!confirmed) return;
 
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("name", product.name)
+      .eq("category", product.category);
+
+    if (error) {
+      console.error("Could not delete product:", error);
+      return;
+    }
+
     setProducts((currentProducts) =>
       currentProducts.filter((item) => item !== product),
     );
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     if (!name.trim() || !category.trim() || !price.trim()) {
@@ -155,26 +168,73 @@ export default function ProductsPage() {
       return;
     }
 
-    const updatedProduct: Product = {
-      name: name.trim(),
-      category: category.trim(),
-      price: `$${numericPrice.toLocaleString("en-US", {
-        maximumFractionDigits: 2,
-      })}`,
-      sales: Math.max(0, Math.floor(Number(sales) || 0)),
-      status,
-    };
+    const numericSales = Math.max(
+      0,
+      Math.floor(Number(sales) || 0),
+    );
 
     if (editingProduct) {
+      const { error } = await supabase
+        .from("products")
+        .update({
+          name: name.trim(),
+          category: category.trim(),
+          price: numericPrice,
+          sales: numericSales,
+          status,
+        })
+        .eq("name", editingProduct.name)
+        .eq("category", editingProduct.category);
+
+      if (error) {
+        console.error("Could not update product:", error);
+        return;
+      }
+
+      const updatedProduct: Product = {
+        name: name.trim(),
+        category: category.trim(),
+        price: formatPrice(numericPrice),
+        sales: numericSales,
+        status,
+      };
+
       setProducts((currentProducts) =>
         currentProducts.map((product) =>
-          product === editingProduct ? updatedProduct : product,
+          product === editingProduct
+            ? updatedProduct
+            : product,
         ),
       );
     } else {
+      const { data, error } = await supabase
+        .from("products")
+        .insert({
+          name: name.trim(),
+          category: category.trim(),
+          price: numericPrice,
+          sales: numericSales,
+          status,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Could not create product:", error);
+        return;
+      }
+
+      const createdProduct = data as DatabaseProduct;
+
       setProducts((currentProducts) => [
+        {
+          name: createdProduct.name,
+          category: createdProduct.category,
+          price: formatPrice(createdProduct.price),
+          sales: createdProduct.sales,
+          status: createdProduct.status,
+        },
         ...currentProducts,
-        updatedProduct,
       ]);
     }
 
@@ -324,7 +384,9 @@ export default function ProductsPage() {
                   id="product-category"
                   type="text"
                   value={category}
-                  onChange={(event) => setCategory(event.target.value)}
+                  onChange={(event) =>
+                    setCategory(event.target.value)
+                  }
                   placeholder="Development"
                   className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
                   required
@@ -346,7 +408,9 @@ export default function ProductsPage() {
                     min="0"
                     step="0.01"
                     value={price}
-                    onChange={(event) => setPrice(event.target.value)}
+                    onChange={(event) =>
+                      setPrice(event.target.value)
+                    }
                     placeholder="2500"
                     className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
                     required
@@ -367,7 +431,9 @@ export default function ProductsPage() {
                     min="0"
                     step="1"
                     value={sales}
-                    onChange={(event) => setSales(event.target.value)}
+                    onChange={(event) =>
+                      setSales(event.target.value)
+                    }
                     placeholder="0"
                     className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
                   />
@@ -385,7 +451,9 @@ export default function ProductsPage() {
                 <select
                   id="product-status"
                   value={status}
-                  onChange={(event) => setStatus(event.target.value)}
+                  onChange={(event) =>
+                    setStatus(event.target.value)
+                  }
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-slate-400"
                 >
                   <option value="Active">Active</option>

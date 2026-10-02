@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import ProductsTable, {
   type Product,
 } from "@/components/products/ProductsTable";
+
+const STORAGE_KEY = "biz-os-products";
 
 const initialProducts: Product[] = [
   {
@@ -46,11 +48,58 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] =
     useState<Product | null>(null);
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
   const [sales, setSales] = useState("");
   const [status, setStatus] = useState("Active");
+
+  // Load saved products from this browser.
+  useEffect(() => {
+    try {
+      const savedProducts = localStorage.getItem(STORAGE_KEY);
+
+      if (savedProducts !== null) {
+        const parsedProducts: unknown = JSON.parse(savedProducts);
+
+        if (
+          Array.isArray(parsedProducts) &&
+          parsedProducts.every(
+            (product) =>
+              product !== null &&
+              typeof product === "object" &&
+              typeof product.name === "string" &&
+              typeof product.category === "string" &&
+              typeof product.price === "string" &&
+              typeof product.sales === "number" &&
+              typeof product.status === "string",
+          )
+        ) {
+          setProducts(parsedProducts as Product[]);
+        }
+      }
+    } catch {
+      console.error("Could not load saved products.");
+    } finally {
+      setIsLoaded(true);
+    }
+  }, []);
+
+  // Save products whenever the list changes.
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(products),
+      );
+    } catch {
+      console.error("Could not save products in this browser.");
+    }
+  }, [products, isLoaded]);
 
   const activeProducts = products.filter(
     (product) => product.status === "Active",
@@ -75,7 +124,7 @@ export default function ProductsPage() {
     setEditingProduct(product);
     setName(product.name);
     setCategory(product.category);
-    setPrice(product.price.replace(/^\$/, ""));
+    setPrice(product.price.replace(/^\$/, "").replace(/,/g, ""));
     setSales(String(product.sales));
     setStatus(product.status);
     setIsModalOpen(true);
@@ -100,13 +149,19 @@ export default function ProductsPage() {
       return;
     }
 
-    const cleanPrice = price.trim().replace(/^\$+/, "");
+    const numericPrice = Number(price);
+
+    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+      return;
+    }
 
     const updatedProduct: Product = {
       name: name.trim(),
       category: category.trim(),
-      price: `$${cleanPrice}`,
-      sales: Math.max(0, Number(sales) || 0),
+      price: `$${numericPrice.toLocaleString("en-US", {
+        maximumFractionDigits: 2,
+      })}`,
+      sales: Math.max(0, Math.floor(Number(sales) || 0)),
       status,
     };
 
@@ -188,11 +243,17 @@ export default function ProductsPage() {
               </div>
             </section>
 
-            <ProductsTable
-              products={products}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
+            {!isLoaded ? (
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                Loading products...
+              </div>
+            ) : (
+              <ProductsTable
+                products={products}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            )}
           </div>
         </div>
       </div>

@@ -1,15 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import {
   Bell,
   ChevronDown,
   Command,
   Search,
+  User,
+  Settings,
+  LogOut,
 } from "lucide-react";
 
 export default function Topbar() {
+  const [profileOpen, setProfileOpen] = useState(false);
+
   return (
-    <header className="flex h-[72px] items-center justify-between border-b border-slate-200 bg-white px-6">
+    <header className="relative flex h-[72px] items-center justify-between border-b border-slate-200 bg-white px-6">
       <div>
         <p className="text-xs text-slate-400">
           Workspace
@@ -52,20 +58,65 @@ export default function Topbar() {
           <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-slate-900" />
         </button>
 
-        <button
-          type="button"
-          className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 transition hover:bg-slate-50"
-        >
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">
-            ME
-          </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setProfileOpen(!profileOpen)}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 transition hover:bg-slate-50"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">
+              ME
+            </div>
 
-          <span className="hidden text-sm font-medium text-slate-700 sm:block">
-            Monjur
-          </span>
+            <span className="hidden text-sm font-medium text-slate-700 sm:block">
+              Monjur
+            </span>
 
-          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-        </button>
+            <ChevronDown
+              className={`h-3.5 w-3.5 text-slate-400 transition ${
+                profileOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {profileOpen && (
+            <div className="absolute right-0 top-12 z-50 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+              <div className="border-b border-slate-100 px-3 py-2">
+                <p className="text-sm font-semibold text-slate-900">
+                  Monjur Elahi
+                </p>
+
+                <p className="text-xs text-slate-400">
+                  Administrator
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                <User className="h-4 w-4" />
+                Profile
+              </button>
+
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </button>
+
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

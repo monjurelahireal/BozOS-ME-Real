@@ -1,57 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 type Customer = {
   id: number;
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   status: "Active" | "Inactive";
 };
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([
-    {
-      id: 1,
-      name: "Acme Studio",
-      email: "hello@acmestudio.com",
-      phone: "+1 555-0101",
-      status: "Active",
-    },
-    {
-      id: 2,
-      name: "Nova Digital",
-      email: "contact@novadigital.com",
-      phone: "+1 555-0102",
-      status: "Active",
-    },
-  ]);
-
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  function addCustomer() {
-    if (!name.trim() || !email.trim()) {
+  async function loadCustomers() {
+    setLoading(true);
+    setError("");
+
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
       return;
     }
 
-    const newCustomer: Customer = {
-      id: customers.length + 1,
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      status: "Active",
-    };
+    setCustomers(data ?? []);
+    setLoading(false);
+  }
 
-    setCustomers([newCustomer, ...customers]);
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  async function addCustomer() {
+    if (!name.trim() || !email.trim()) {
+      setError("Name and email are required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    const { data, error } = await supabase
+      .from("customers")
+      .insert({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || null,
+        status: "Active",
+      })
+      .select()
+      .single();
+
+    if (error) {
+      setError(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setCustomers((current) => [data, ...current]);
 
     setName("");
     setEmail("");
     setPhone("");
     setShowForm(false);
+    setSaving(false);
   }
 
   return (
@@ -66,12 +91,21 @@ export default function CustomersPage() {
           </div>
 
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              setShowForm(!showForm);
+              setError("");
+            }}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
           >
             {showForm ? "Close" : "Add Customer"}
           </button>
         </div>
+
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         {showForm && (
           <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -123,9 +157,10 @@ export default function CustomersPage() {
 
             <button
               onClick={addCustomer}
-              className="mt-5 rounded-lg bg-slate-900 px-5 py-2 font-medium text-white hover:bg-slate-700"
+              disabled={saving}
+              className="mt-5 rounded-lg bg-slate-900 px-5 py-2 font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Save Customer
+              {saving ? "Saving..." : "Save Customer"}
             </button>
           </div>
         )}
@@ -137,45 +172,61 @@ export default function CustomersPage() {
             </h2>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="px-6 py-3 font-medium">Customer</th>
-                  <th className="px-6 py-3 font-medium">Email</th>
-                  <th className="px-6 py-3 font-medium">Phone</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {customers.map((customer) => (
-                  <tr
-                    key={customer.id}
-                    className="border-t border-slate-100"
-                  >
-                    <td className="px-6 py-4 font-medium">
-                      {customer.name}
-                    </td>
-
-                    <td className="px-6 py-4 text-slate-600">
-                      {customer.email}
-                    </td>
-
-                    <td className="px-6 py-4 text-slate-600">
-                      {customer.phone || "—"}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                        {customer.status}
-                      </span>
-                    </td>
+          {loading ? (
+            <div className="px-6 py-10 text-center text-sm text-slate-500">
+              Loading customers...
+            </div>
+          ) : customers.length === 0 ? (
+            <div className="px-6 py-10 text-center text-sm text-slate-500">
+              No customers found.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-6 py-3 font-medium">Customer</th>
+                    <th className="px-6 py-3 font-medium">Email</th>
+                    <th className="px-6 py-3 font-medium">Phone</th>
+                    <th className="px-6 py-3 font-medium">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+
+                <tbody>
+                  {customers.map((customer) => (
+                    <tr
+                      key={customer.id}
+                      className="border-t border-slate-100"
+                    >
+                      <td className="px-6 py-4 font-medium">
+                        {customer.name}
+                      </td>
+
+                      <td className="px-6 py-4 text-slate-600">
+                        {customer.email}
+                      </td>
+
+                      <td className="px-6 py-4 text-slate-600">
+                        {customer.phone || "—"}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            customer.status === "Active"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {customer.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </main>

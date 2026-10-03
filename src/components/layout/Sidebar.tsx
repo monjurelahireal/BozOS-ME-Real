@@ -100,9 +100,13 @@ export default function Sidebar() {
       </div>
 
       <div className="border-t border-slate-200 p-3">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+        <Link
+          href="/settings"
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+            pathname.startsWith("/settings")
+              ? "bg-slate-100 font-medium text-slate-900"
+              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+          }`}
         >
           <Settings
             className="h-[17px] w-[17px]"
@@ -110,10 +114,13 @@ export default function Sidebar() {
           />
 
           <span>Settings</span>
-        </button>
+        </Link>
 
-        <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+        <button
+          type="button"
+          className="mt-3 flex w-full items-center gap-3 rounded-xl bg-slate-50 p-3 text-left transition hover:bg-slate-100"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
             ME
           </div>
 
@@ -127,8 +134,8 @@ export default function Sidebar() {
             </p>
           </div>
 
-          <ChevronDown className="h-4 w-4 text-slate-400" />
-        </div>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+        </button>
       </div>
     </aside>
   );

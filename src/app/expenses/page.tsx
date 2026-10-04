@@ -3,62 +3,61 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-type Invoice = {
+type Expense = {
   id: number;
-  invoice_number: string;
-  customer_name: string;
+  description: string;
   amount: number | string;
-  status: string;
-  due_date: string;
+  expense_date: string;
   created_at: string;
 };
 
-export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loadingInvoices, setLoadingInvoices] = useState(true);
-  const [invoiceError, setInvoiceError] = useState("");
+export default function ExpensesPage() {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loadingExpenses, setLoadingExpenses] = useState(true);
+  const [expenseError, setExpenseError] = useState("");
 
-  const [showInvoiceForm, setShowInvoiceForm] = useState(false);
-  const [customer, setCustomer] = useState("");
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [expenseDate, setExpenseDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  async function loadInvoices() {
-    setLoadingInvoices(true);
-    setInvoiceError("");
+  async function loadExpenses() {
+    setLoadingExpenses(true);
+    setExpenseError("");
 
     const { data, error: fetchError } = await supabase
-      .from("invoices")
-      .select(
-        "id, invoice_number, customer_name, amount, status, due_date, created_at",
-      )
+      .from("expenses")
+      .select("id, description, amount, expense_date, created_at")
       .order("created_at", { ascending: false });
 
     if (fetchError) {
-      setInvoiceError(fetchError.message);
-      setInvoices([]);
-      setLoadingInvoices(false);
+      setExpenseError(fetchError.message);
+      setExpenses([]);
+      setLoadingExpenses(false);
       return;
     }
 
-    setInvoices((data ?? []) as Invoice[]);
-    setLoadingInvoices(false);
+    setExpenses((data ?? []) as Expense[]);
+    setLoadingExpenses(false);
   }
 
   useEffect(() => {
-    loadInvoices();
+    loadExpenses();
   }, []);
 
-  async function createInvoice() {
-    if (!customer.trim() || !amount.trim()) {
-      setError("Customer and amount are required.");
+  async function createExpense() {
+    if (!description.trim() || !amount.trim()) {
+      setError("Description and amount are required.");
       return;
     }
 
-    const invoiceAmount = Number(amount);
+    const expenseAmount = Number(amount);
 
-    if (!Number.isFinite(invoiceAmount) || invoiceAmount <= 0) {
+    if (!Number.isFinite(expenseAmount) || expenseAmount <= 0) {
       setError("Amount must be greater than 0.");
       return;
     }
@@ -66,14 +65,10 @@ export default function InvoicesPage() {
     setSaving(true);
     setError("");
 
-    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
-
-    const { error: insertError } = await supabase.from("invoices").insert({
-      invoice_number: invoiceNumber,
-      customer_name: customer.trim(),
-      amount: invoiceAmount,
-      status: "pending",
-      due_date: new Date().toISOString().split("T")[0],
+    const { error: insertError } = await supabase.from("expenses").insert({
+      description: description.trim(),
+      amount: expenseAmount,
+      expense_date: expenseDate,
     });
 
     if (insertError) {
@@ -82,31 +77,19 @@ export default function InvoicesPage() {
       return;
     }
 
-    setCustomer("");
+    setDescription("");
     setAmount("");
-    setShowInvoiceForm(false);
+    setExpenseDate(new Date().toISOString().split("T")[0]);
+    setShowExpenseForm(false);
     setSaving(false);
 
-    await loadInvoices();
+    await loadExpenses();
   }
 
-  function getStatusClass(status: string) {
-    const normalizedStatus = status.toLowerCase();
-
-    if (normalizedStatus === "paid") {
-      return "bg-emerald-50 text-emerald-700";
-    }
-
-    if (normalizedStatus === "pending") {
-      return "bg-amber-50 text-amber-700";
-    }
-
-    if (normalizedStatus === "overdue") {
-      return "bg-red-50 text-red-700";
-    }
-
-    return "bg-slate-100 text-slate-700";
-  }
+  const totalExpenses = expenses.reduce(
+    (total, expense) => total + Number(expense.amount || 0),
+    0,
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
@@ -116,107 +99,118 @@ export default function InvoicesPage() {
             <p className="text-sm font-medium text-slate-500">Business</p>
 
             <h1 className="mt-1 text-3xl font-bold tracking-tight">
-              Invoices
+              Expenses
             </h1>
 
             <p className="mt-1 text-sm text-slate-500">
-              Manage your business invoices.
+              Track and manage your business expenses.
             </p>
           </div>
 
           <button
             onClick={() => {
               setError("");
-              setShowInvoiceForm(true);
+              setShowExpenseForm(true);
             }}
             className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
           >
-            + Create invoice
+            + Add expense
           </button>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-            <div>
-              <h2 className="font-semibold">All invoices</h2>
+        <div className="mb-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              Total expenses
+            </p>
 
-              <p className="mt-1 text-xs text-slate-500">
-                {invoices.length} invoice
-                {invoices.length === 1 ? "" : "s"} found
-              </p>
-            </div>
+            <p className="mt-3 text-3xl font-bold tracking-tight">
+              ${totalExpenses.toLocaleString()}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-400">
+              From Supabase
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              Expense records
+            </p>
+
+            <p className="mt-3 text-3xl font-bold tracking-tight">
+              {expenses.length}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-400">
+              Total recorded expenses
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-6 py-4">
+            <h2 className="font-semibold">All expenses</h2>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Latest expense activity
+            </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[750px] text-left text-sm">
+            <table className="w-full min-w-[650px] text-left text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>
-                  <th className="px-6 py-3 font-medium">Invoice</th>
-                  <th className="px-6 py-3 font-medium">Customer</th>
+                  <th className="px-6 py-3 font-medium">Description</th>
                   <th className="px-6 py-3 font-medium">Amount</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium">Due date</th>
+                  <th className="px-6 py-3 font-medium">Date</th>
                 </tr>
               </thead>
 
               <tbody>
-                {loadingInvoices ? (
+                {loadingExpenses ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={3}
                       className="px-6 py-10 text-center text-sm text-slate-500"
                     >
-                      Loading invoices...
+                      Loading expenses...
                     </td>
                   </tr>
-                ) : invoiceError ? (
+                ) : expenseError ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={3}
                       className="px-6 py-10 text-center text-sm text-red-600"
                     >
-                      {invoiceError}
+                      {expenseError}
                     </td>
                   </tr>
-                ) : invoices.length === 0 ? (
+                ) : expenses.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={3}
                       className="px-6 py-10 text-center text-sm text-slate-500"
                     >
-                      No invoices found.
+                      No expenses found.
                     </td>
                   </tr>
                 ) : (
-                  invoices.map((invoice) => (
+                  expenses.map((expense) => (
                     <tr
-                      key={invoice.id}
+                      key={expense.id}
                       className="border-t border-slate-100"
                     >
-                      <td className="px-6 py-4 font-semibold">
-                        #{invoice.invoice_number}
-                      </td>
-
-                      <td className="px-6 py-4 text-slate-600">
-                        {invoice.customer_name}
-                      </td>
-
                       <td className="px-6 py-4 font-medium">
-                        ${Number(invoice.amount).toLocaleString()}
+                        {expense.description}
                       </td>
 
-                      <td className="px-6 py-4">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClass(
-                            invoice.status,
-                          )}`}
-                        >
-                          {invoice.status}
-                        </span>
+                      <td className="px-6 py-4 font-semibold">
+                        ${Number(expense.amount).toLocaleString()}
                       </td>
 
                       <td className="px-6 py-4 text-slate-600">
-                        {invoice.due_date}
+                        {expense.expense_date}
                       </td>
                     </tr>
                   ))
@@ -226,14 +220,14 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        {showInvoiceForm && (
+        {showExpenseForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
               <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Create Invoice</h2>
+                <h2 className="text-xl font-semibold">Add Expense</h2>
 
                 <button
-                  onClick={() => setShowInvoiceForm(false)}
+                  onClick={() => setShowExpenseForm(false)}
                   className="text-2xl text-slate-400 hover:text-slate-700"
                 >
                   ×
@@ -243,13 +237,13 @@ export default function InvoicesPage() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">
-                    Customer
+                    Description
                   </label>
 
                   <input
-                    value={customer}
-                    onChange={(e) => setCustomer(e.target.value)}
-                    placeholder="Customer name"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Office rent, software, supplies..."
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
                   />
                 </div>
@@ -270,6 +264,19 @@ export default function InvoicesPage() {
                   />
                 </div>
 
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Expense date
+                  </label>
+
+                  <input
+                    type="date"
+                    value={expenseDate}
+                    onChange={(e) => setExpenseDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
+                  />
+                </div>
+
                 {error && (
                   <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
                     {error}
@@ -277,11 +284,11 @@ export default function InvoicesPage() {
                 )}
 
                 <button
-                  onClick={createInvoice}
+                  onClick={createExpense}
                   disabled={saving}
                   className="w-full rounded-lg bg-slate-900 px-4 py-2.5 font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {saving ? "Saving..." : "Save Invoice"}
+                  {saving ? "Saving..." : "Save Expense"}
                 </button>
               </div>
             </div>

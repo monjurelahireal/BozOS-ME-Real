@@ -8,6 +8,7 @@ import {
   FileText,
   LayoutDashboard,
   Package,
+  Receipt,
   Settings,
   Users,
 } from "lucide-react";
@@ -32,6 +33,11 @@ const navigation = [
     label: "Products",
     icon: Package,
     href: "/products",
+  },
+  {
+    label: "Expenses",
+    icon: Receipt,
+    href: "/expenses",
   },
   {
     label: "Reports",

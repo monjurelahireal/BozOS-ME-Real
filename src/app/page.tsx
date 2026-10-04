@@ -1,61 +1,119 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
+import { supabase } from "@/lib/supabase";
 
-const stats = [
-  {
-    label: "Revenue",
-    value: "$24,580",
-    change: "+12.5%",
-    detail: "vs last month",
-  },
-  {
-    label: "Expenses",
-    value: "$8,420",
-    change: "+4.8%",
-    detail: "vs last month",
-  },
-  {
-    label: "Net Profit",
-    value: "$16,160",
-    change: "+18.2%",
-    detail: "vs last month",
-  },
-  {
-    label: "Outstanding",
-    value: "$4,280",
-    change: "8 invoices",
-    detail: "awaiting payment",
-  },
-];
+type RecentInvoice = {
+  id: number;
+  invoice_number: string;
+  customer_name: string;
+  amount: number | string;
+  status: string;
+};
 
-const recentInvoices = [
-  {
-    id: "#INV-1048",
-    customer: "Acme Studio",
-    amount: "$2,450",
-    status: "Paid",
-  },
-  {
-    id: "#INV-1047",
-    customer: "Nova Digital",
-    amount: "$1,820",
-    status: "Pending",
-  },
-  {
-    id: "#INV-1046",
-    customer: "Vertex Labs",
-    amount: "$3,200",
-    status: "Overdue",
-  },
-  {
-    id: "#INV-1045",
-    customer: "Pixel House",
-    amount: "$980",
-    status: "Paid",
-  },
-];
+type Expense = {
+  id: number;
+  amount: number | string;
+};
 
 export default function Home() {
+  const router = useRouter();
+
+  const [recentInvoices, setRecentInvoices] = useState<RecentInvoice[]>([]);
+  const [revenue, setRevenue] = useState(0);
+  const [expenses, setExpenses] = useState(0);
+  const [netProfit, setNetProfit] = useState(0);
+  const [outstanding, setOutstanding] = useState(0);
+  const [outstandingCount, setOutstandingCount] = useState(0);
+
+  const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [invoiceError, setInvoiceError] = useState("");
+
+  useEffect(() => {
+    async function loadDashboardData() {
+      setLoadingInvoices(true);
+      setInvoiceError("");
+
+      const [invoiceResult, expenseResult] = await Promise.all([
+        supabase
+          .from("invoices")
+          .select(
+            "id, invoice_number, customer_name, amount, status, created_at",
+          )
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("expenses")
+          .select("id, amount")
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (invoiceResult.error) {
+        setInvoiceError(invoiceResult.error.message);
+        setRecentInvoices([]);
+        setRevenue(0);
+        setOutstanding(0);
+        setOutstandingCount(0);
+        setExpenses(0);
+        setNetProfit(0);
+        setLoadingInvoices(false);
+        return;
+      }
+
+      if (expenseResult.error) {
+        setInvoiceError(expenseResult.error.message);
+        setExpenses(0);
+        setNetProfit(0);
+        setLoadingInvoices(false);
+        return;
+      }
+
+      const invoices = invoiceResult.data ?? [];
+      const expenseData = (expenseResult.data ?? []) as Expense[];
+
+      const paidInvoices = invoices.filter(
+        (invoice) => invoice.status?.toLowerCase() === "paid",
+      );
+
+      const unpaidInvoices = invoices.filter((invoice) => {
+        const status = invoice.status?.toLowerCase();
+
+        return status === "pending" || status === "overdue";
+      });
+
+      const revenueTotal = paidInvoices.reduce(
+        (total, invoice) => total + Number(invoice.amount || 0),
+        0,
+      );
+
+      const outstandingTotal = unpaidInvoices.reduce(
+        (total, invoice) => total + Number(invoice.amount || 0),
+        0,
+      );
+
+      const expenseTotal = expenseData.reduce(
+        (total, expense) => total + Number(expense.amount || 0),
+        0,
+      );
+
+      const profitTotal = revenueTotal - expenseTotal;
+
+      setRevenue(revenueTotal);
+      setExpenses(expenseTotal);
+      setNetProfit(profitTotal);
+      setOutstanding(outstandingTotal);
+      setOutstandingCount(unpaidInvoices.length);
+
+      setRecentInvoices(invoices.slice(0, 4));
+      setLoadingInvoices(false);
+    }
+
+    loadDashboardData();
+  }, []);
+
   return (
     <main className="min-h-screen bg-[#f7f8fa] text-slate-900">
       <div className="flex min-h-screen">
@@ -73,7 +131,7 @@ export default function Home() {
                   </p>
 
                   <h3 className="mt-1 text-2xl font-bold tracking-tight">
-                    Good morning, Monjur
+                    Good morning, Monjur Elahi
                   </h3>
 
                   <p className="mt-1 text-sm text-slate-500">
@@ -81,51 +139,123 @@ export default function Home() {
                   </p>
                 </div>
 
-                <button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                <button
+                  onClick={() => router.push("/invoices")}
+                  className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                >
                   + Create invoice
                 </button>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {stats.map((stat) => (
-                  <div
-                    key={stat.label}
-                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between">
-                      <p className="text-sm font-medium text-slate-500">
-                        {stat.label}
-                      </p>
-
-                      <span className="text-xs text-slate-400">
-                        •••
-                      </span>
-                    </div>
-
-                    <p className="mt-4 text-2xl font-bold tracking-tight">
-                      {stat.value}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <p className="text-sm font-medium text-slate-500">
+                      Revenue
                     </p>
 
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="text-xs font-semibold text-emerald-600">
-                        {stat.change}
-                      </span>
-
-                      <span className="text-xs text-slate-400">
-                        {stat.detail}
-                      </span>
-                    </div>
+                    <span className="text-xs text-slate-400">•••</span>
                   </div>
-                ))}
+
+                  <p className="mt-4 text-2xl font-bold tracking-tight">
+                    ${revenue.toLocaleString()}
+                  </p>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs font-semibold text-emerald-600">
+                      Paid invoices
+                    </span>
+
+                    <span className="text-xs text-slate-400">
+                      total collected
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <p className="text-sm font-medium text-slate-500">
+                      Expenses
+                    </p>
+
+                    <span className="text-xs text-slate-400">•••</span>
+                  </div>
+
+                  <p className="mt-4 text-2xl font-bold tracking-tight">
+                    ${expenses.toLocaleString()}
+                  </p>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-500">
+                      Total expenses
+                    </span>
+
+                    <span className="text-xs text-slate-400">
+                      from Supabase
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <p className="text-sm font-medium text-slate-500">
+                      Net Profit
+                    </p>
+
+                    <span className="text-xs text-slate-400">•••</span>
+                  </div>
+
+                  <p className="mt-4 text-2xl font-bold tracking-tight">
+                    ${netProfit.toLocaleString()}
+                  </p>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <span
+                      className={`text-xs font-semibold ${
+                        netProfit >= 0
+                          ? "text-emerald-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      Revenue - Expenses
+                    </span>
+
+                    <span className="text-xs text-slate-400">
+                      current total
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <p className="text-sm font-medium text-slate-500">
+                      Outstanding
+                    </p>
+
+                    <span className="text-xs text-slate-400">•••</span>
+                  </div>
+
+                  <p className="mt-4 text-2xl font-bold tracking-tight">
+                    ${outstanding.toLocaleString()}
+                  </p>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs font-semibold text-emerald-600">
+                      {outstandingCount} invoices
+                    </span>
+
+                    <span className="text-xs text-slate-400">
+                      awaiting payment
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-semibold">
-                        Revenue overview
-                      </h4>
+                      <h4 className="font-semibold">Revenue overview</h4>
 
                       <p className="mt-1 text-xs text-slate-500">
                         Monthly revenue performance
@@ -160,15 +290,16 @@ export default function Home() {
                     <span>Jul</span>
                     <span>Aug</span>
                     <span>Sep</span>
+                    <span>Oct</span>
+                    <span>Nov</span>
+                    <span>Dec</span>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-semibold">
-                        Business health
-                      </h4>
+                      <h4 className="font-semibold">Business health</h4>
 
                       <p className="mt-1 text-xs text-slate-500">
                         Current operational status
@@ -229,16 +360,17 @@ export default function Home() {
               <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 p-5">
                   <div>
-                    <h4 className="font-semibold">
-                      Recent invoices
-                    </h4>
+                    <h4 className="font-semibold">Recent invoices</h4>
 
                     <p className="mt-1 text-xs text-slate-500">
                       Latest invoice activity
                     </p>
                   </div>
 
-                  <button className="text-xs font-semibold text-slate-700 hover:underline">
+                  <button
+                    onClick={() => router.push("/invoices")}
+                    className="text-xs font-semibold text-slate-700 hover:underline"
+                  >
                     View all
                   </button>
                 </div>
@@ -247,57 +379,80 @@ export default function Home() {
                   <table className="w-full min-w-[650px] text-left text-sm">
                     <thead className="bg-slate-50 text-xs text-slate-500">
                       <tr>
-                        <th className="px-5 py-3 font-medium">
-                          Invoice
-                        </th>
-
-                        <th className="px-5 py-3 font-medium">
-                          Customer
-                        </th>
-
-                        <th className="px-5 py-3 font-medium">
-                          Amount
-                        </th>
-
-                        <th className="px-5 py-3 font-medium">
-                          Status
-                        </th>
+                        <th className="px-5 py-3 font-medium">Invoice</th>
+                        <th className="px-5 py-3 font-medium">Customer</th>
+                        <th className="px-5 py-3 font-medium">Amount</th>
+                        <th className="px-5 py-3 font-medium">Status</th>
                       </tr>
                     </thead>
 
                     <tbody>
-                      {recentInvoices.map((invoice) => (
-                        <tr
-                          key={invoice.id}
-                          className="border-t border-slate-100"
-                        >
-                          <td className="px-5 py-4 font-semibold">
-                            {invoice.id}
-                          </td>
-
-                          <td className="px-5 py-4 text-slate-600">
-                            {invoice.customer}
-                          </td>
-
-                          <td className="px-5 py-4 font-medium">
-                            {invoice.amount}
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                invoice.status === "Paid"
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : invoice.status === "Pending"
-                                    ? "bg-amber-50 text-amber-700"
-                                    : "bg-red-50 text-red-700"
-                              }`}
-                            >
-                              {invoice.status}
-                            </span>
+                      {loadingInvoices ? (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="px-5 py-6 text-center text-sm text-slate-500"
+                          >
+                            Loading invoices...
                           </td>
                         </tr>
-                      ))}
+                      ) : invoiceError ? (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="px-5 py-6 text-center text-sm text-red-600"
+                          >
+                            {invoiceError}
+                          </td>
+                        </tr>
+                      ) : recentInvoices.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="px-5 py-6 text-center text-sm text-slate-500"
+                          >
+                            No invoices found.
+                          </td>
+                        </tr>
+                      ) : (
+                        recentInvoices.map((invoice) => {
+                          const status = invoice.status?.toLowerCase();
+
+                          const statusClass =
+                            status === "paid"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : status === "pending"
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-red-50 text-red-700";
+
+                          return (
+                            <tr
+                              key={invoice.id}
+                              className="border-t border-slate-100"
+                            >
+                              <td className="px-5 py-4 font-semibold">
+                                {invoice.invoice_number}
+                              </td>
+
+                              <td className="px-5 py-4 text-slate-600">
+                                {invoice.customer_name}
+                              </td>
+
+                              <td className="px-5 py-4 font-medium">
+                                ${Number(invoice.amount).toLocaleString()}
+                              </td>
+
+                              <td className="px-5 py-4">
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}`}
+                                >
+                                  {invoice.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>

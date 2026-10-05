@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  DEFAULT_CURRENCY,
+  SUPPORTED_CURRENCIES,
+  normalizeCurrency,
+  saveWorkspaceCurrency,
+} from "@/lib/currency";
 
 type WorkspaceSettings = {
   id: number;
@@ -12,12 +18,24 @@ type WorkspaceSettings = {
   updated_at: string;
 };
 
+function getCurrencyName(code: string) {
+  try {
+    return (
+      new Intl.DisplayNames(["en"], {
+        type: "currency",
+      }).of(code) ?? code
+    );
+  } catch {
+    return code;
+  }
+}
+
 export default function SettingsPage() {
   const [settingsId, setSettingsId] = useState<number | null>(null);
 
   const [workspaceName, setWorkspaceName] = useState("BizOS");
   const [accountName, setAccountName] = useState("Monjur Elahi");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,7 +68,9 @@ export default function SettingsPage() {
         setSettingsId(settings.id);
         setWorkspaceName(settings.workspace_name);
         setAccountName(settings.account_name);
-        setCurrency(settings.currency);
+        setCurrency(normalizeCurrency(settings.currency));
+      } else {
+        setCurrency(DEFAULT_CURRENCY);
       }
 
       setLoading(false);
@@ -65,6 +85,8 @@ export default function SettingsPage() {
       return;
     }
 
+    const selectedCurrency = normalizeCurrency(currency);
+
     setSaving(true);
     setError("");
     setSaved(false);
@@ -72,7 +94,7 @@ export default function SettingsPage() {
     const settingsData = {
       workspace_name: workspaceName.trim(),
       account_name: accountName.trim(),
-      currency,
+      currency: selectedCurrency,
       updated_at: new Date().toISOString(),
     };
 
@@ -106,6 +128,10 @@ export default function SettingsPage() {
       setSaving(false);
       return;
     }
+
+    setCurrency(selectedCurrency);
+
+    saveWorkspaceCurrency(selectedCurrency);
 
     setSaved(true);
     setSaving(false);
@@ -209,11 +235,11 @@ export default function SettingsPage() {
                 onChange={(e) => setCurrency(e.target.value)}
                 className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400"
               >
-                <option value="USD">USD — US Dollar</option>
-                <option value="EUR">EUR — Euro</option>
-                <option value="GBP">GBP — British Pound</option>
-                <option value="CAD">CAD — Canadian Dollar</option>
-                <option value="AUD">AUD — Australian Dollar</option>
+                {SUPPORTED_CURRENCIES.map((code) => (
+                  <option key={code} value={code}>
+                    {code} — {getCurrencyName(code)}
+                  </option>
+                ))}
               </select>
             </div>
           </section>

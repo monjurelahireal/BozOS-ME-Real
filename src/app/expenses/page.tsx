@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  DEFAULT_CURRENCY,
+  formatCurrency,
+  loadWorkspaceCurrency,
+} from "@/lib/currency";
 
 type Expense = {
   id: number;
@@ -14,6 +19,8 @@ type Expense = {
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+
   const [loadingExpenses, setLoadingExpenses] = useState(true);
   const [expenseError, setExpenseError] = useState("");
 
@@ -30,19 +37,25 @@ export default function ExpensesPage() {
     setLoadingExpenses(true);
     setExpenseError("");
 
-    const { data, error: fetchError } = await supabase
-      .from("expenses")
-      .select("id, description, amount, expense_date, created_at")
-      .order("created_at", { ascending: false });
+    const [expenseResult, workspaceCurrency] = await Promise.all([
+      supabase
+        .from("expenses")
+        .select("id, description, amount, expense_date, created_at")
+        .order("created_at", { ascending: false }),
 
-    if (fetchError) {
-      setExpenseError(fetchError.message);
+      loadWorkspaceCurrency(),
+    ]);
+
+    setCurrency(workspaceCurrency);
+
+    if (expenseResult.error) {
+      setExpenseError(expenseResult.error.message);
       setExpenses([]);
       setLoadingExpenses(false);
       return;
     }
 
-    setExpenses((data ?? []) as Expense[]);
+    setExpenses((expenseResult.data ?? []) as Expense[]);
     setLoadingExpenses(false);
   }
 
@@ -135,7 +148,7 @@ export default function ExpensesPage() {
             </p>
 
             <p className="mt-3 text-3xl font-bold tracking-tight">
-              ${totalExpenses.toLocaleString()}
+              {formatCurrency(totalExpenses, currency)}
             </p>
 
             <p className="mt-2 text-xs text-slate-400">
@@ -216,7 +229,7 @@ export default function ExpensesPage() {
                       </td>
 
                       <td className="px-6 py-4 font-semibold">
-                        ${Number(expense.amount).toLocaleString()}
+                        {formatCurrency(expense.amount, currency)}
                       </td>
 
                       <td className="px-6 py-4 text-slate-600">

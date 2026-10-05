@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -129,18 +130,27 @@ export default function SettingsPage() {
   return (
     <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6">
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            Settings
-          </p>
+        <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+              Settings
+            </p>
 
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">
-            Settings
-          </h1>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900">
+              Settings
+            </h1>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Manage your BizOS workspace and account settings.
-          </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage your BizOS workspace and account settings.
+            </p>
+          </div>
+
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            ← Back to Overview
+          </Link>
         </div>
 
         {error && (

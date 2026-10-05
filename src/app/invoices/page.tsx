@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -131,15 +132,11 @@ export default function InvoicesPage() {
 
       setInvoices((current) =>
         current.map((invoice) =>
-          invoice.id === editingInvoice.id
-            ? (data as Invoice)
-            : invoice,
+          invoice.id === editingInvoice.id ? (data as Invoice) : invoice,
         ),
       );
     } else {
-      const invoiceNumber = `INV-${Date.now()
-        .toString()
-        .slice(-6)}`;
+      const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
 
       const { data, error: insertError } = await supabase
         .from("invoices")
@@ -161,10 +158,7 @@ export default function InvoicesPage() {
         return;
       }
 
-      setInvoices((current) => [
-        data as Invoice,
-        ...current,
-      ]);
+      setInvoices((current) => [data as Invoice, ...current]);
     }
 
     resetForm();
@@ -196,10 +190,7 @@ export default function InvoicesPage() {
     );
   }
 
-  async function changeStatus(
-    invoice: Invoice,
-    newStatus: string,
-  ) {
+  async function changeStatus(invoice: Invoice, newStatus: string) {
     setError("");
 
     const { data, error: updateError } = await supabase
@@ -220,9 +211,7 @@ export default function InvoicesPage() {
 
     setInvoices((current) =>
       current.map((item) =>
-        item.id === invoice.id
-          ? (data as Invoice)
-          : item,
+        item.id === invoice.id ? (data as Invoice) : item,
       ),
     );
   }
@@ -263,13 +252,22 @@ export default function InvoicesPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={openCreateForm}
-            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-          >
-            + Create invoice
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              ← Back to Overview
+            </Link>
+
+            <button
+              type="button"
+              onClick={openCreateForm}
+              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            >
+              + Create invoice
+            </button>
+          </div>
         </div>
 
         {error && !showInvoiceForm && (
@@ -294,29 +292,12 @@ export default function InvoicesPage() {
             <table className="w-full min-w-[1050px] text-left text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>
-                  <th className="px-6 py-3 font-medium">
-                    Invoice
-                  </th>
-
-                  <th className="px-6 py-3 font-medium">
-                    Customer
-                  </th>
-
-                  <th className="px-6 py-3 font-medium">
-                    Amount
-                  </th>
-
-                  <th className="px-6 py-3 font-medium">
-                    Status
-                  </th>
-
-                  <th className="px-6 py-3 font-medium">
-                    Due date
-                  </th>
-
-                  <th className="px-6 py-3 font-medium">
-                    Actions
-                  </th>
+                  <th className="px-6 py-3 font-medium">Invoice</th>
+                  <th className="px-6 py-3 font-medium">Customer</th>
+                  <th className="px-6 py-3 font-medium">Amount</th>
+                  <th className="px-6 py-3 font-medium">Status</th>
+                  <th className="px-6 py-3 font-medium">Due date</th>
+                  <th className="px-6 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
 
@@ -407,9 +388,7 @@ export default function InvoicesPage() {
                         <div className="flex items-center gap-3">
                           <button
                             type="button"
-                            onClick={() =>
-                              openEditForm(invoice)
-                            }
+                            onClick={() => openEditForm(invoice)}
                             className="text-sm font-medium text-blue-600 hover:text-blue-800"
                           >
                             Edit
@@ -417,9 +396,7 @@ export default function InvoicesPage() {
 
                           <button
                             type="button"
-                            onClick={() =>
-                              deleteInvoice(invoice)
-                            }
+                            onClick={() => deleteInvoice(invoice)}
                             className="text-sm font-medium text-red-600 hover:text-red-800"
                           >
                             Delete

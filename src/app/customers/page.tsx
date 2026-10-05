@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -66,9 +67,7 @@ export default function CustomersPage() {
         phone: phone.trim() || null,
         company: company.trim() || null,
       })
-      .select(
-        "id, name, email, phone, company, created_at",
-      )
+      .select("id, name, email, phone, company, created_at")
       .single();
 
     if (insertError) {
@@ -99,15 +98,24 @@ export default function CustomersPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => {
-              setShowForm(!showForm);
-              setError("");
-            }}
-            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-          >
-            {showForm ? "Close" : "+ Add Customer"}
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              ← Back to Overview
+            </Link>
+
+            <button
+              onClick={() => {
+                setShowForm(!showForm);
+                setError("");
+              }}
+              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            >
+              {showForm ? "Close" : "+ Add Customer"}
+            </button>
+          </div>
         </div>
 
         {error && (

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
@@ -188,14 +189,23 @@ export default function ReportsPage() {
 
           <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl">
-              <div className="mb-8">
-                <p className="text-sm text-slate-500">Workspace</p>
+              <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                  <p className="text-sm text-slate-500">Workspace</p>
 
-                <h1 className="mt-1 text-2xl font-bold">Reports</h1>
+                  <h1 className="mt-1 text-2xl font-bold">Reports</h1>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Review your business performance and financial summary.
-                </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Review your business performance and financial summary.
+                  </p>
+                </div>
+
+                <Link
+                  href="/"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  ← Back to Overview
+                </Link>
               </div>
 
               {loading ? (

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -107,15 +108,24 @@ export default function ExpensesPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => {
-              setError("");
-              setShowExpenseForm(true);
-            }}
-            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-          >
-            + Add expense
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              ← Back to Overview
+            </Link>
+
+            <button
+              onClick={() => {
+                setError("");
+                setShowExpenseForm(true);
+              }}
+              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            >
+              + Add expense
+            </button>
+          </div>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2">

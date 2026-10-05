@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
@@ -219,13 +220,22 @@ export default function ProductsPage() {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition hover:bg-slate-800"
-              >
-                + Add product
-              </button>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/"
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  ← Back to Overview
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={openAddModal}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition hover:bg-slate-800"
+                >
+                  + Add product
+                </button>
+              </div>
             </section>
 
             <section className="grid gap-4 sm:grid-cols-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
 
 type Invoice = {
@@ -13,14 +13,23 @@ type Invoice = {
   created_at: string;
 };
 
+const statusOptions = ["pending", "paid", "overdue"];
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const [invoiceError, setInvoiceError] = useState("");
 
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+
   const [customer, setCustomer] = useState("");
   const [amount, setAmount] = useState("");
+  const [dueDate, setDueDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [status, setStatus] = useState("pending");
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,9 +59,37 @@ export default function InvoicesPage() {
     loadInvoices();
   }, []);
 
-  async function createInvoice() {
-    if (!customer.trim() || !amount.trim()) {
-      setError("Customer and amount are required.");
+  function resetForm() {
+    setCustomer("");
+    setAmount("");
+    setDueDate(new Date().toISOString().split("T")[0]);
+    setStatus("pending");
+    setEditingInvoice(null);
+    setShowInvoiceForm(false);
+    setSaving(false);
+    setError("");
+  }
+
+  function openCreateForm() {
+    resetForm();
+    setShowInvoiceForm(true);
+  }
+
+  function openEditForm(invoice: Invoice) {
+    setEditingInvoice(invoice);
+    setCustomer(invoice.customer_name);
+    setAmount(String(invoice.amount));
+    setDueDate(invoice.due_date);
+    setStatus(invoice.status.toLowerCase());
+    setError("");
+    setShowInvoiceForm(true);
+  }
+
+  async function saveInvoice(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!customer.trim() || !amount.trim() || !dueDate) {
+      setError("Customer, amount, and due date are required.");
       return;
     }
 
@@ -63,35 +100,135 @@ export default function InvoicesPage() {
       return;
     }
 
-    setSaving(true);
-    setError("");
-
-    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
-
-    const { error: insertError } = await supabase.from("invoices").insert({
-      invoice_number: invoiceNumber,
-      customer_name: customer.trim(),
-      amount: invoiceAmount,
-      status: "pending",
-      due_date: new Date().toISOString().split("T")[0],
-    });
-
-    if (insertError) {
-      setError(insertError.message);
-      setSaving(false);
+    if (!statusOptions.includes(status.toLowerCase())) {
+      setError("Please select a valid status.");
       return;
     }
 
-    setCustomer("");
-    setAmount("");
-    setShowInvoiceForm(false);
-    setSaving(false);
+    setSaving(true);
+    setError("");
 
-    await loadInvoices();
+    if (editingInvoice) {
+      const { data, error: updateError } = await supabase
+        .from("invoices")
+        .update({
+          customer_name: customer.trim(),
+          amount: invoiceAmount,
+          status: status.toLowerCase(),
+          due_date: dueDate,
+        })
+        .eq("id", editingInvoice.id)
+        .select(
+          "id, invoice_number, customer_name, amount, status, due_date, created_at",
+        )
+        .single();
+
+      if (updateError) {
+        setError(updateError.message);
+        setSaving(false);
+        return;
+      }
+
+      setInvoices((current) =>
+        current.map((invoice) =>
+          invoice.id === editingInvoice.id
+            ? (data as Invoice)
+            : invoice,
+        ),
+      );
+    } else {
+      const invoiceNumber = `INV-${Date.now()
+        .toString()
+        .slice(-6)}`;
+
+      const { data, error: insertError } = await supabase
+        .from("invoices")
+        .insert({
+          invoice_number: invoiceNumber,
+          customer_name: customer.trim(),
+          amount: invoiceAmount,
+          status: status.toLowerCase(),
+          due_date: dueDate,
+        })
+        .select(
+          "id, invoice_number, customer_name, amount, status, due_date, created_at",
+        )
+        .single();
+
+      if (insertError) {
+        setError(insertError.message);
+        setSaving(false);
+        return;
+      }
+
+      setInvoices((current) => [
+        data as Invoice,
+        ...current,
+      ]);
+    }
+
+    resetForm();
   }
 
-  function getStatusClass(status: string) {
-    const normalizedStatus = status.toLowerCase();
+  async function deleteInvoice(invoice: Invoice) {
+    const confirmed = window.confirm(
+      `Delete ${invoice.invoice_number}? This action cannot be undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("invoices")
+      .delete()
+      .eq("id", invoice.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setInvoices((current) =>
+      current.filter((item) => item.id !== invoice.id),
+    );
+  }
+
+  async function changeStatus(
+    invoice: Invoice,
+    newStatus: string,
+  ) {
+    setError("");
+
+    const { data, error: updateError } = await supabase
+      .from("invoices")
+      .update({
+        status: newStatus,
+      })
+      .eq("id", invoice.id)
+      .select(
+        "id, invoice_number, customer_name, amount, status, due_date, created_at",
+      )
+      .single();
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setInvoices((current) =>
+      current.map((item) =>
+        item.id === invoice.id
+          ? (data as Invoice)
+          : item,
+      ),
+    );
+  }
+
+  function getStatusClass(statusValue: string) {
+    const normalizedStatus = statusValue.toLowerCase();
 
     if (normalizedStatus === "paid") {
       return "bg-emerald-50 text-emerald-700";
@@ -111,29 +248,35 @@ export default function InvoicesPage() {
   return (
     <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex items-end justify-between">
+        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="text-sm font-medium text-slate-500">Business</p>
+            <p className="text-sm font-medium text-slate-500">
+              Business
+            </p>
 
             <h1 className="mt-1 text-3xl font-bold tracking-tight">
               Invoices
             </h1>
 
             <p className="mt-1 text-sm text-slate-500">
-              Manage your business invoices.
+              Create, edit, track, and manage your business invoices.
             </p>
           </div>
 
           <button
-            onClick={() => {
-              setError("");
-              setShowInvoiceForm(true);
-            }}
+            type="button"
+            onClick={openCreateForm}
             className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
           >
             + Create invoice
           </button>
         </div>
+
+        {error && !showInvoiceForm && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
@@ -148,14 +291,32 @@ export default function InvoicesPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[750px] text-left text-sm">
+            <table className="w-full min-w-[1050px] text-left text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>
-                  <th className="px-6 py-3 font-medium">Invoice</th>
-                  <th className="px-6 py-3 font-medium">Customer</th>
-                  <th className="px-6 py-3 font-medium">Amount</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium">Due date</th>
+                  <th className="px-6 py-3 font-medium">
+                    Invoice
+                  </th>
+
+                  <th className="px-6 py-3 font-medium">
+                    Customer
+                  </th>
+
+                  <th className="px-6 py-3 font-medium">
+                    Amount
+                  </th>
+
+                  <th className="px-6 py-3 font-medium">
+                    Status
+                  </th>
+
+                  <th className="px-6 py-3 font-medium">
+                    Due date
+                  </th>
+
+                  <th className="px-6 py-3 font-medium">
+                    Actions
+                  </th>
                 </tr>
               </thead>
 
@@ -163,7 +324,7 @@ export default function InvoicesPage() {
                 {loadingInvoices ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-6 py-10 text-center text-sm text-slate-500"
                     >
                       Loading invoices...
@@ -172,7 +333,7 @@ export default function InvoicesPage() {
                 ) : invoiceError ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-6 py-10 text-center text-sm text-red-600"
                     >
                       {invoiceError}
@@ -181,7 +342,7 @@ export default function InvoicesPage() {
                 ) : invoices.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-6 py-10 text-center text-sm text-slate-500"
                     >
                       No invoices found.
@@ -202,21 +363,68 @@ export default function InvoicesPage() {
                       </td>
 
                       <td className="px-6 py-4 font-medium">
-                        ${Number(invoice.amount).toLocaleString()}
+                        $
+                        {Number(invoice.amount).toLocaleString(
+                          "en-US",
+                          {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          },
+                        )}
                       </td>
 
                       <td className="px-6 py-4">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClass(
+                        <select
+                          value={invoice.status.toLowerCase()}
+                          onChange={(event) =>
+                            changeStatus(
+                              invoice,
+                              event.target.value,
+                            )
+                          }
+                          className={`rounded-full border-0 px-3 py-1 text-xs font-semibold outline-none ${getStatusClass(
                             invoice.status,
                           )}`}
                         >
-                          {invoice.status}
-                        </span>
+                          {statusOptions.map((statusOption) => (
+                            <option
+                              key={statusOption}
+                              value={statusOption}
+                              className="bg-white text-slate-900"
+                            >
+                              {statusOption.charAt(0).toUpperCase() +
+                                statusOption.slice(1)}
+                            </option>
+                          ))}
+                        </select>
                       </td>
 
                       <td className="px-6 py-4 text-slate-600">
                         {invoice.due_date}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openEditForm(invoice)
+                            }
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              deleteInvoice(invoice)
+                            }
+                            className="text-sm font-medium text-red-600 hover:text-red-800"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -227,20 +435,37 @@ export default function InvoicesPage() {
         </div>
 
         {showInvoiceForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Create Invoice</h2>
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="my-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            >
+              <div className="mb-5 flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">
+                    {editingInvoice
+                      ? "Edit Invoice"
+                      : "Create Invoice"}
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {editingInvoice
+                      ? `Update ${editingInvoice.invoice_number}.`
+                      : "Create a new business invoice."}
+                  </p>
+                </div>
 
                 <button
-                  onClick={() => setShowInvoiceForm(false)}
+                  type="button"
+                  onClick={resetForm}
                   className="text-2xl text-slate-400 hover:text-slate-700"
                 >
                   ×
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <form onSubmit={saveInvoice} className="space-y-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">
                     Customer
@@ -248,9 +473,12 @@ export default function InvoicesPage() {
 
                   <input
                     value={customer}
-                    onChange={(e) => setCustomer(e.target.value)}
+                    onChange={(event) =>
+                      setCustomer(event.target.value)
+                    }
                     placeholder="Customer name"
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
+                    required
                   />
                 </div>
 
@@ -264,10 +492,47 @@ export default function InvoicesPage() {
                     min="0"
                     step="0.01"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(event) =>
+                      setAmount(event.target.value)
+                    }
                     placeholder="0"
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
+                    required
                   />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Due date
+                  </label>
+
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(event) =>
+                      setDueDate(event.target.value)
+                    }
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Status
+                  </label>
+
+                  <select
+                    value={status}
+                    onChange={(event) =>
+                      setStatus(event.target.value)
+                    }
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-slate-500"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                  </select>
                 </div>
 
                 {error && (
@@ -276,14 +541,28 @@ export default function InvoicesPage() {
                   </p>
                 )}
 
-                <button
-                  onClick={createInvoice}
-                  disabled={saving}
-                  className="w-full rounded-lg bg-slate-900 px-4 py-2.5 font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : "Save Invoice"}
-                </button>
-              </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="flex-1 rounded-lg bg-slate-900 px-4 py-2.5 font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {saving
+                      ? "Saving..."
+                      : editingInvoice
+                        ? "Save changes"
+                        : "Save Invoice"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

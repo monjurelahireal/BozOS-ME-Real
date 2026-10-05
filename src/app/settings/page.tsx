@@ -1,22 +1,133 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+type WorkspaceSettings = {
+  id: number;
+  workspace_name: string;
+  account_name: string;
+  currency: string;
+  updated_at: string;
+};
 
 export default function SettingsPage() {
+  const [settingsId, setSettingsId] = useState<number | null>(null);
+
   const [workspaceName, setWorkspaceName] = useState("BizOS");
   const [accountName, setAccountName] = useState("Monjur Elahi");
+  const [currency, setCurrency] = useState("USD");
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
-  function handleSave() {
+  useEffect(() => {
+    async function loadSettings() {
+      setLoading(true);
+      setError("");
+
+      const { data, error: fetchError } = await supabase
+        .from("workspace_settings")
+        .select(
+          "id, workspace_name, account_name, currency, updated_at",
+        )
+        .order("id", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (fetchError) {
+        setError(fetchError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
+        const settings = data as WorkspaceSettings;
+
+        setSettingsId(settings.id);
+        setWorkspaceName(settings.workspace_name);
+        setAccountName(settings.account_name);
+        setCurrency(settings.currency);
+      }
+
+      setLoading(false);
+    }
+
+    loadSettings();
+  }, []);
+
+  async function handleSave() {
+    if (!workspaceName.trim() || !accountName.trim()) {
+      setError("Workspace name and account name are required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setSaved(false);
+
+    const settingsData = {
+      workspace_name: workspaceName.trim(),
+      account_name: accountName.trim(),
+      currency,
+      updated_at: new Date().toISOString(),
+    };
+
+    let saveError = null;
+
+    if (settingsId) {
+      const { error: updateError } = await supabase
+        .from("workspace_settings")
+        .update(settingsData)
+        .eq("id", settingsId);
+
+      saveError = updateError;
+    } else {
+      const { data, error: insertError } = await supabase
+        .from("workspace_settings")
+        .insert(settingsData)
+        .select(
+          "id, workspace_name, account_name, currency, updated_at",
+        )
+        .single();
+
+      saveError = insertError;
+
+      if (data) {
+        setSettingsId((data as WorkspaceSettings).id);
+      }
+    }
+
+    if (saveError) {
+      setError(saveError.message);
+      setSaving(false);
+      return;
+    }
+
     setSaved(true);
+    setSaving(false);
 
     setTimeout(() => {
       setSaved(false);
-    }, 2000);
+    }, 2500);
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-50 p-6">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
+            Loading settings...
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
+    <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -32,6 +143,12 @@ export default function SettingsPage() {
           </p>
         </div>
 
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         <div className="grid gap-6 md:grid-cols-2">
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">
@@ -43,11 +160,15 @@ export default function SettingsPage() {
             </p>
 
             <div className="mt-5">
-              <label className="text-xs font-medium text-slate-500">
+              <label
+                htmlFor="workspace-name"
+                className="text-xs font-medium text-slate-500"
+              >
                 Workspace name
               </label>
 
               <input
+                id="workspace-name"
                 value={workspaceName}
                 onChange={(e) => setWorkspaceName(e.target.value)}
                 className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400"
@@ -63,6 +184,28 @@ export default function SettingsPage() {
                 Business
               </p>
             </div>
+
+            <div className="mt-5">
+              <label
+                htmlFor="currency"
+                className="text-xs font-medium text-slate-500"
+              >
+                Currency
+              </label>
+
+              <select
+                id="currency"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400"
+              >
+                <option value="USD">USD — US Dollar</option>
+                <option value="EUR">EUR — Euro</option>
+                <option value="GBP">GBP — British Pound</option>
+                <option value="CAD">CAD — Canadian Dollar</option>
+                <option value="AUD">AUD — Australian Dollar</option>
+              </select>
+            </div>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -75,11 +218,15 @@ export default function SettingsPage() {
             </p>
 
             <div className="mt-5">
-              <label className="text-xs font-medium text-slate-500">
+              <label
+                htmlFor="account-name"
+                className="text-xs font-medium text-slate-500"
+              >
                 Name
               </label>
 
               <input
+                id="account-name"
                 value={accountName}
                 onChange={(e) => setAccountName(e.target.value)}
                 className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400"
@@ -108,9 +255,10 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleSave}
-            className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            disabled={saving}
+            className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Save changes
+            {saving ? "Saving..." : "Save changes"}
           </button>
         </div>
       </div>

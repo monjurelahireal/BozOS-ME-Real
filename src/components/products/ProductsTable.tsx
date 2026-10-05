@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react";
 
 export type Product = {
-  id?: string;
+  id: number;
   name: string;
   category: string;
-  price: string;
-  sales: number;
-  status: string;
+  price: number | string;
+  stock: number;
+  created_at?: string;
 };
 
 type ProductsTableProps = {
@@ -48,6 +48,13 @@ export default function ProductsTable({
     });
   }, [products, search, category]);
 
+  function formatPrice(price: number | string) {
+    return `$${Number(price).toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+
   return (
     <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 p-5">
@@ -56,6 +63,7 @@ export default function ProductsTable({
             <h2 className="text-lg font-semibold text-slate-950">
               Product list
             </h2>
+
             <p className="mt-1 text-sm text-slate-500">
               Search, filter, edit, and manage products.
             </p>
@@ -91,23 +99,27 @@ export default function ProductsTable({
         <table className="w-full min-w-[850px] text-left">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
-              {["Product", "Category", "Price", "Sales", "Status", "Actions"].map(
-                (heading) => (
-                  <th
-                    key={heading}
-                    className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
-                  >
-                    {heading}
-                  </th>
-                ),
-              )}
+              {[
+                "Product",
+                "Category",
+                "Price",
+                "Stock",
+                "Actions",
+              ].map((heading) => (
+                <th
+                  key={heading}
+                  className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                >
+                  {heading}
+                </th>
+              ))}
             </tr>
           </thead>
 
           <tbody>
             {filteredProducts.map((product) => (
               <tr
-                key={`${product.name}-${product.category}`}
+                key={product.id}
                 className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"
               >
                 <td className="px-5 py-4 text-sm font-medium text-slate-900">
@@ -119,22 +131,18 @@ export default function ProductsTable({
                 </td>
 
                 <td className="px-5 py-4 text-sm font-medium text-slate-900">
-                  {product.price}
-                </td>
-
-                <td className="px-5 py-4 text-sm text-slate-500">
-                  {product.sales}
+                  {formatPrice(product.price)}
                 </td>
 
                 <td className="px-5 py-4">
                   <span
                     className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                      product.status === "Active"
+                      product.stock > 0
                         ? "bg-emerald-50 text-emerald-700"
-                        : "bg-slate-100 text-slate-600"
+                        : "bg-red-50 text-red-700"
                     }`}
                   >
-                    {product.status}
+                    {product.stock}
                   </span>
                 </td>
 
@@ -163,7 +171,7 @@ export default function ProductsTable({
             {filteredProducts.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={5}
                   className="px-5 py-10 text-center text-sm text-slate-500"
                 >
                   No products found.

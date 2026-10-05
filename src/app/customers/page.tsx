@@ -8,15 +8,19 @@ type Customer = {
   name: string;
   email: string;
   phone: string | null;
-  status: "Active" | "Inactive";
+  company: string | null;
+  created_at: string;
 };
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [showForm, setShowForm] = useState(false);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [company, setCompany] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -25,18 +29,19 @@ export default function CustomersPage() {
     setLoading(true);
     setError("");
 
-    const { data, error } = await supabase
+    const { data, error: fetchError } = await supabase
       .from("customers")
-      .select("*")
-      .order("id", { ascending: false });
+      .select("id, name, email, phone, company, created_at")
+      .order("created_at", { ascending: false });
 
-    if (error) {
-      setError(error.message);
+    if (fetchError) {
+      setError(fetchError.message);
+      setCustomers([]);
       setLoading(false);
       return;
     }
 
-    setCustomers(data ?? []);
+    setCustomers((data ?? []) as Customer[]);
     setLoading(false);
   }
 
@@ -53,38 +58,42 @@ export default function CustomersPage() {
     setSaving(true);
     setError("");
 
-    const { data, error } = await supabase
+    const { data, error: insertError } = await supabase
       .from("customers")
       .insert({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || null,
-        status: "Active",
+        company: company.trim() || null,
       })
-      .select()
+      .select(
+        "id, name, email, phone, company, created_at",
+      )
       .single();
 
-    if (error) {
-      setError(error.message);
+    if (insertError) {
+      setError(insertError.message);
       setSaving(false);
       return;
     }
 
-    setCustomers((current) => [data, ...current]);
+    setCustomers((current) => [data as Customer, ...current]);
 
     setName("");
     setEmail("");
     setPhone("");
+    setCompany("");
     setShowForm(false);
     setSaving(false);
   }
 
   return (
     <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Customers</h1>
+
             <p className="mt-1 text-sm text-slate-500">
               Manage your business customers.
             </p>
@@ -95,9 +104,9 @@ export default function CustomersPage() {
               setShowForm(!showForm);
               setError("");
             }}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
           >
-            {showForm ? "Close" : "Add Customer"}
+            {showForm ? "Close" : "+ Add Customer"}
           </button>
         </div>
 
@@ -108,10 +117,12 @@ export default function CustomersPage() {
         )}
 
         {showForm && (
-          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-5 text-lg font-semibold">Add New Customer</h2>
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-5 text-lg font-semibold">
+              Add New Customer
+            </h2>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Name
@@ -153,23 +164,41 @@ export default function CustomersPage() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
                 />
               </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Company
+                </label>
+
+                <input
+                  type="text"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="Company name"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
+                />
+              </div>
             </div>
 
             <button
               onClick={addCustomer}
               disabled={saving}
-              className="mt-5 rounded-lg bg-slate-900 px-5 py-2 font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-5 rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Customer"}
             </button>
           </div>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-6 py-4">
             <h2 className="font-semibold">
               Customer List ({customers.length})
             </h2>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Customers saved in Supabase
+            </p>
           </div>
 
           {loading ? (
@@ -182,13 +211,13 @@ export default function CustomersPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-500">
+              <table className="w-full min-w-[750px] text-left text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500">
                   <tr>
                     <th className="px-6 py-3 font-medium">Customer</th>
+                    <th className="px-6 py-3 font-medium">Company</th>
                     <th className="px-6 py-3 font-medium">Email</th>
                     <th className="px-6 py-3 font-medium">Phone</th>
-                    <th className="px-6 py-3 font-medium">Status</th>
                   </tr>
                 </thead>
 
@@ -198,8 +227,12 @@ export default function CustomersPage() {
                       key={customer.id}
                       className="border-t border-slate-100"
                     >
-                      <td className="px-6 py-4 font-medium">
+                      <td className="px-6 py-4 font-semibold">
                         {customer.name}
+                      </td>
+
+                      <td className="px-6 py-4 text-slate-600">
+                        {customer.company || "—"}
                       </td>
 
                       <td className="px-6 py-4 text-slate-600">
@@ -208,18 +241,6 @@ export default function CustomersPage() {
 
                       <td className="px-6 py-4 text-slate-600">
                         {customer.phone || "—"}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            customer.status === "Active"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {customer.status}
-                        </span>
                       </td>
                     </tr>
                   ))}
